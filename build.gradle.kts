@@ -45,6 +45,8 @@ dependencies {
     implementation("org.springdoc:springdoc-openapi-starter-webmvc-ui:2.8.13")
     implementation("org.springframework.boot:spring-boot-starter-mail")
     implementation("org.apache.poi:poi-ooxml:5.3.0")
+    implementation("org.mapstruct:mapstruct:1.5.5.Final")
+    annotationProcessor("org.mapstruct:mapstruct-processor:1.5.5.Final")
 }
 
 tasks.withType<Test> {

@@ -34,6 +34,7 @@ public class TokenService {
                 .expirationTime(Date.from(now.plus(1, java.time.temporal.ChronoUnit.HOURS)))
                 .claim("role", user.getRole())
                 .claim("email", user.getEmail())
+                .claim("id", user.getId())
                 .build();
 
         var jwt = new SignedJWT(header, claims);
