@@ -46,8 +46,10 @@ public class AuthService {
         var user = userRepository.findByEmail(request.getEmail()).orElseThrow(() -> new UsernameNotFoundException("User not found"));
 
         if(!user.getIsVerified()){
-            userRepository.deleteById(user.getId());
-            throw new DisabledException("Email is not verified");
+            verificationService.sendVerification(user);
+            throw new DisabledException(
+                    "Email is not verified. Please check your email for the verification message."
+            );
         }
 
         var token = tokenService.generateToken(user);

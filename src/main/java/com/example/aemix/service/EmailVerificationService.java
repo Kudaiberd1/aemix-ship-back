@@ -39,10 +39,10 @@ public class EmailVerificationService {
         tokenRepo.save(t);
 
         String link = baseUrl + "/api/auth/verify-email?token=" + token;
-        mailService.send(
+        mailService.sendVerificationEmail(
                 user.getEmail(),
-                "Verify your email",
-                "Click to verify: " + link + "\nThis link expires in " + ttlMinutes + " minutes."
+                link,
+                ttlMinutes
         );
     }
 
