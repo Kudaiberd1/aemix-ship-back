@@ -54,6 +54,6 @@ public class AuthController {
     @GetMapping("/verify-email")
     public ResponseEntity<?> verifyEmail(@RequestParam String token) {
         verificationService.verify(token);
-        return ResponseEntity.ok("Email verified ✅");
+        return ResponseEntity.ok("Email verified");
     }
 }

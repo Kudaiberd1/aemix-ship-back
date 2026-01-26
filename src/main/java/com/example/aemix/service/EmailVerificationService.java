@@ -52,7 +52,6 @@ public class EmailVerificationService {
         );
     }
 
-    @Transactional
     public void verify(String token) {
         EmailVerificationToken t = tokenRepo.findByToken(token)
                 .orElseThrow(() -> new IllegalArgumentException("Invalid token"));
