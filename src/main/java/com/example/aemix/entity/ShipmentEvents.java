@@ -27,13 +27,14 @@ public class ShipmentEvents {
     private UUID shipmentId;
 
     @Enumerated(EnumType.STRING)
-    private Stage stage;
+    private Stage currentStage;
+
+    @Enumerated(EnumType.STRING)
+    private Stage oldStage;
 
     @CreatedDate
     @Column(nullable = false, updatable = false)
     private LocalDateTime eventTime;
-
-    private String comment;
 
     @PrePersist
     public void prePersist() {

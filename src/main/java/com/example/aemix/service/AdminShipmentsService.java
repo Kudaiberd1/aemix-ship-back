@@ -1,12 +1,16 @@
 package com.example.aemix.service;
 
-import com.example.aemix.dto.requests.UpdateShipmentRequest;
+import com.example.aemix.dto.responses.UserResponse;
 import com.example.aemix.entity.ShipmentEvents;
 import com.example.aemix.entity.Shipments;
+import com.example.aemix.entity.User;
+import com.example.aemix.entity.enums.Role;
 import com.example.aemix.entity.enums.Stage;
 import com.example.aemix.exception.FileBadRequestException;
+import com.example.aemix.mapper.UserMapper;
 import com.example.aemix.repository.ShipmentEventsRepository;
 import com.example.aemix.repository.ShipmentsRepository;
+import com.example.aemix.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.poi.ss.usermodel.*;
@@ -26,6 +30,8 @@ public class AdminShipmentsService {
 
     private final ShipmentsRepository shipmentsRepository;
     private final ShipmentEventsRepository shipmentEventsRepository;
+    private final UserRepository userRepository;
+    private final UserMapper userMapper;
 
     @Transactional
     public void uploadShipments(MultipartFile file) {
@@ -61,9 +67,9 @@ public class AdminShipmentsService {
             for(int i=0; i<results.size(); i++){
                 ShipmentEvents shipmentEvent = ShipmentEvents.builder()
                                 .shipmentId(results.get(i).getId())
-                                .stage(Stage.IN_TRANSIT)
-                                .comment(results.get(i).getTrackCode()+" product is currently in transit.").build();
-
+                                .oldStage(Stage.CHINA_WAREHOUSE)
+                                .currentStage(Stage.IN_TRANSIT)
+                                .build();
                 events.add(shipmentEvent);
             }
 
@@ -95,15 +101,16 @@ public class AdminShipmentsService {
         return s == null || s.trim().isEmpty();
     }
 
-    public void updateShipment(String trackCode, UpdateShipmentRequest request) {
+    public void updateShipment(String trackCode, Stage stage) {
         Shipments shipment = shipmentsRepository.findByTrackCode(trackCode).orElseThrow(() -> new IllegalArgumentException("Invalid track code"));
-        shipment.setCurentStage(request.getStage());
+        Stage oldStage = shipment.getCurentStage();
+        shipment.setCurentStage(stage);
         shipmentsRepository.save(shipment);
 
         ShipmentEvents event = ShipmentEvents.builder()
                 .shipmentId(shipment.getId())
-                .stage(request.getStage())
-                .comment(request.getComment())
+                .oldStage(oldStage)
+                .currentStage(stage)
                 .build();
         shipmentEventsRepository.save(event);
     }
@@ -114,9 +121,37 @@ public class AdminShipmentsService {
 
         ShipmentEvents event = ShipmentEvents.builder()
                 .shipmentId(shipment.getId())
-                .stage(Stage.DELETED)
-                .comment("Successfully deleted shipment")
+                .oldStage(shipment.getCurentStage())
+                .currentStage(Stage.DELETED)
                 .build();
         shipmentEventsRepository.save(event);
+    }
+
+    public void createShipments(String trackCode) {
+        Shipments shipments = Shipments.builder()
+                .trackCode(trackCode)
+                .curentStage(Stage.IN_TRANSIT).build();
+        shipmentsRepository.save(shipments);
+
+        ShipmentEvents shipmentEvent = ShipmentEvents.builder()
+                .shipmentId(shipments.getId())
+                .oldStage(Stage.CHINA_WAREHOUSE)
+                .currentStage(Stage.IN_TRANSIT)
+                .build();
+        shipmentEventsRepository.save(shipmentEvent);
+
+    }
+
+    public List<UserResponse> getUsers(){
+        List<User> users = userRepository.findAll();
+
+        return users.stream().map(userMapper::toDto).toList();
+    }
+
+    public void changeUserRole(String userId, String role) {
+        User user = userRepository.findById(Integer.parseInt(userId)).orElseThrow(() -> new IllegalArgumentException("Invalid user id"));
+        role = role.replace("\"", "");
+        user.setRole(role.equalsIgnoreCase("Admin") ? Role.ROLE_ADMIN : Role.ROLE_USER);
+        userRepository.save(user);
     }
 }
