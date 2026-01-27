@@ -150,7 +150,6 @@ public class AdminShipmentsService {
 
     public void changeUserRole(String userId, String role) {
         User user = userRepository.findById(Integer.parseInt(userId)).orElseThrow(() -> new IllegalArgumentException("Invalid user id"));
-        role = role.replace("\"", "");
         user.setRole(role.equalsIgnoreCase("Admin") ? Role.ROLE_ADMIN : Role.ROLE_USER);
         userRepository.save(user);
     }
