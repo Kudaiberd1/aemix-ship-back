@@ -45,7 +45,9 @@ public class SecurityConfig {
                             "/api/auth/**",
                             "/api/auth/**",
                             "/swagger-ui/**",
-                            "/v3/api-docs/**"
+                            "/v3/api-docs/**",
+                            "/api/admin/shipments/russia/**",
+                            "/api/admin/shipments/pickup/**"
                         ).permitAll()
                         .anyRequest().authenticated())
                 .sessionManagement(sessionManagement -> sessionManagement
