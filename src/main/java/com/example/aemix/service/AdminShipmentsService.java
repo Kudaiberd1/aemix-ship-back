@@ -123,6 +123,10 @@ public class AdminShipmentsService {
                 .oldStage(shipment.getCurentStage())
                 .currentStage(Stage.LOST)
                 .build();
+
+        shipment.setCurentStage(Stage.LOST);
+
+        shipmentsRepository.save(shipment);
         shipmentEventsRepository.save(event);
     }
 
