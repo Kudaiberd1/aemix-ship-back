@@ -36,11 +36,9 @@ public class Shipments {
     private List<UserShipments> userShipments = new ArrayList<>();
 
     @CreatedDate
-    @Column(nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
     @LastModifiedDate
-    @Column(nullable = false)
     private LocalDateTime updatedAt;
 
     @PrePersist

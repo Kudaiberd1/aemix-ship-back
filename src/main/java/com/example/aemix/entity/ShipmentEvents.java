@@ -24,7 +24,9 @@ public class ShipmentEvents {
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
 
-    private UUID shipmentId;
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "shipment_id", nullable = false, unique = true)
+    private Shipments shipment;
 
     @Enumerated(EnumType.STRING)
     private Stage currentStage;
@@ -33,7 +35,6 @@ public class ShipmentEvents {
     private Stage oldStage;
 
     @CreatedDate
-    @Column(nullable = false, updatable = false)
     private LocalDateTime eventTime;
 
     @PrePersist

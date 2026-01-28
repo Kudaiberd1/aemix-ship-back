@@ -141,8 +141,8 @@ public class AdminShipmentsService {
                 .oldStage(Stage.CHINA_WAREHOUSE)
                 .currentStage(Stage.IN_TRANSIT)
                 .build();
-        shipmentEventsRepository.save(shipmentEvent);
 
+        shipmentEventsRepository.save(shipmentEvent);
     }
 
     public List<UserResponse> getUsers(){
