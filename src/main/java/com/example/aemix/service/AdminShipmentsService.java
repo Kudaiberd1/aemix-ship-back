@@ -117,12 +117,11 @@ public class AdminShipmentsService {
 
     public void deleteShipment(String trackCode) {
         Shipments shipment = shipmentsRepository.findByTrackCode(trackCode).orElseThrow(() -> new IllegalArgumentException("Invalid track code"));
-        shipmentsRepository.delete(shipment);
 
         ShipmentEvents event = ShipmentEvents.builder()
                 .shipmentId(shipment.getId())
                 .oldStage(shipment.getCurentStage())
-                .currentStage(Stage.DELETED)
+                .currentStage(Stage.LOST)
                 .build();
         shipmentEventsRepository.save(event);
     }
