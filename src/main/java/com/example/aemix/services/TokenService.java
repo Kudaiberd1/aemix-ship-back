@@ -31,7 +31,7 @@ public class TokenService {
         var claims = new JWTClaimsSet.Builder()
                 .issueTime(Date.from(now))
                 .expirationTime(Date.from(now.plusMillis(jwtConfig.getJwtExpiration())))
-                .claim("email", user.getEmail())
+                .claim("emailOrTelegramId", user.getEmailOrTelegramId())
                 .claim("role", user.getRole())
                 .build();
 

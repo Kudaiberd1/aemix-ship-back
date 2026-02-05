@@ -6,6 +6,9 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import org.springframework.data.annotation.CreatedDate;
+import org.springframework.data.annotation.LastModifiedDate;
+import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -19,44 +22,42 @@ import java.util.List;
 @NoArgsConstructor
 @AllArgsConstructor
 @Entity
+@EntityListeners(AuditingEntityListener.class)
 @Table(name = "users")
 public class User implements UserDetails {
 
     @Id
     @GeneratedValue
-    private Integer id;
+    private Long id;
 
-    @Column(unique = true, nullable = false )
-    private String email;
+    @Column(unique = true, nullable = false)
+    private String emailOrTelegramId;
 
     @Column(nullable = false)
     private String password;
 
-    @Column(name = "telegram_id", unique = true)
-    private Long telegramId;
+    @OneToOne(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    private UserVerification verification;
 
-    @Column(name = "telegram_username")
-    private String telegramUsername;
+    @OneToOne(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    private PasswordResetToken passwordResetToken;
 
-    @Column(name = "telegram_first_name")
-    private String telegramFirstName;
-
-    @Column(name = "telegram_last_name")
-    private String telegramLastName;
-
-    @Column(name = "telegram_photo_url")
-    private String telegramPhotoUrl;
-
-    @Column(name = "verification_code")
-    private String verificationCode;
-
-    @Column(name = "verification_expiration")
-    private LocalDateTime verificationExpiresAt;
+    @OneToOne(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    private TelegramUser telegramUser;
 
     @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
     private Role role;
 
     private Boolean isVerified;
+
+    @CreatedDate
+    @Column(name = "created_at", nullable = false, updatable = false)
+    private LocalDateTime createdAt;
+
+    @LastModifiedDate
+    @Column(name = "updated_at", nullable = false)
+    private LocalDateTime updatedAt;
 
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
@@ -65,7 +66,7 @@ public class User implements UserDetails {
 
     @Override
     public String getUsername() {
-        return email;
+        return emailOrTelegramId;
     }
 
     @PrePersist

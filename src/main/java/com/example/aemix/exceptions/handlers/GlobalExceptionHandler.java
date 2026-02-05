@@ -29,7 +29,7 @@ import java.util.stream.Collectors;
 public class GlobalExceptionHandler {
     @ExceptionHandler({RequestValidationException.class, BusinessValidationException.class})
     public ResponseEntity<Map<String, Object>> handleValidationException(RuntimeException ex) {
-        return buildResponse(HttpStatus.BAD_REQUEST, "VALIDATION_ERROR", ex.getMessage());
+        return buildResponse(HttpStatus.BAD_REQUEST, ex.getMessage());
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
@@ -46,7 +46,6 @@ public class GlobalExceptionHandler {
         Map<String, Object> body = new HashMap<>();
         body.put("status", HttpStatus.BAD_REQUEST.value());
         body.put("error", HttpStatus.BAD_REQUEST.getReasonPhrase());
-        body.put("code", "REQUEST_VALIDATION_ERROR");
         body.put("message", "Validation failed");
         body.put("timestamp", Instant.now().toString());
         body.put("errors", errors);
@@ -56,33 +55,33 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler({BadCredentialsException.class, UsernameNotFoundException.class})
     public ResponseEntity<Map<String, Object>> handleUnauthorizedAuth(Exception ex) {
-        return buildResponse(HttpStatus.UNAUTHORIZED, "INVALID_CREDENTIALS", "Invalid credentials");
+        return buildResponse(HttpStatus.UNAUTHORIZED, "Invalid credentials");
     }
 
     @ExceptionHandler(UnauthorizedException.class)
     public ResponseEntity<Map<String, Object>> handleUnauthorized(UnauthorizedException ex) {
-        return buildResponse(HttpStatus.UNAUTHORIZED, "UNAUTHORIZED", ex.getMessage());
+        return buildResponse(HttpStatus.UNAUTHORIZED, ex.getMessage());
     }
 
     @ExceptionHandler(ResourceNotFoundException.class)
     public ResponseEntity<Map<String, Object>> handleNotFound(ResourceNotFoundException ex) {
-        return buildResponse(HttpStatus.NOT_FOUND, "NOT_FOUND", ex.getMessage());
+        return buildResponse(HttpStatus.NOT_FOUND, ex.getMessage());
     }
 
     @ExceptionHandler(ConflictException.class)
     public ResponseEntity<Map<String, Object>> handleConflict(ConflictException ex) {
-        return buildResponse(HttpStatus.CONFLICT, "CONFLICT", ex.getMessage());
+        return buildResponse(HttpStatus.CONFLICT, ex.getMessage());
     }
 
     @ExceptionHandler(DisabledException.class)
     public ResponseEntity<Map<String, Object>> handleDisabledException(DisabledException ex) {
-        return buildResponse(HttpStatus.FORBIDDEN, "FORBIDDEN", ex.getMessage());
+        return buildResponse(HttpStatus.FORBIDDEN, ex.getMessage());
     }
 
     @ExceptionHandler({EmailSendException.class, TokenGenerationException.class})
     public ResponseEntity<Map<String, Object>> handleServiceErrors(RuntimeException ex) {
         log.error("Service error occurred", ex);
-        return buildResponse(HttpStatus.INTERNAL_SERVER_ERROR, "INTERNAL_ERROR", ex.getMessage());
+        return buildResponse(HttpStatus.INTERNAL_SERVER_ERROR, ex.getMessage());
     }
 
     @ExceptionHandler(Exception.class)
@@ -90,20 +89,17 @@ public class GlobalExceptionHandler {
         log.error("Unexpected error occurred", ex);
         return buildResponse(
                 HttpStatus.INTERNAL_SERVER_ERROR,
-                "INTERNAL_ERROR",
                 ex.getMessage()
         );
     }
 
     private ResponseEntity<Map<String, Object>> buildResponse(
             HttpStatus status,
-            String code,
             String message
     ) {
         Map<String, Object> body = Map.of(
                 "status", status.value(),
                 "error", status.getReasonPhrase(),
-                "code", code,
                 "message", message,
                 "timestamp", Instant.now().toString()
         );

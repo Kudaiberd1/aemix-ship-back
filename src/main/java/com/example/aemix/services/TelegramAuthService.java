@@ -3,9 +3,11 @@ package com.example.aemix.services;
 import com.example.aemix.config.JwtConfig;
 import com.example.aemix.dto.requests.TelegramAuthRequest;
 import com.example.aemix.dto.responses.LoginResponse;
+import com.example.aemix.entities.TelegramUser;
 import com.example.aemix.entities.User;
 import com.example.aemix.entities.enums.Role;
 import com.example.aemix.exceptions.UnauthorizedException;
+import com.example.aemix.repositories.TelegramUserRepository;
 import com.example.aemix.repositories.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -29,8 +31,6 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 @Slf4j
 public class TelegramAuthService {
-    private static final String TELEGRAM_EMAIL_DOMAIN = "telegram.local";
-
     @Value("${telegram.bot.token}")
     private String botToken;
 
@@ -38,6 +38,7 @@ public class TelegramAuthService {
     private long maxAgeSeconds;
 
     private final UserRepository userRepository;
+    private final TelegramUserRepository telegramUserRepository;
     private final TokenService tokenService;
     private final PasswordEncoder passwordEncoder;
     private final JwtConfig jwtConfig;
@@ -51,13 +52,25 @@ public class TelegramAuthService {
             throw new UnauthorizedException("Telegram login is expired");
         }
 
-        User user = userRepository.findByTelegramId(request.id())
+        User user = telegramUserRepository.findByTelegramId(request.id())
+                .map(TelegramUser::getUser)
                 .orElseGet(() -> registerFromTelegram(request));
+
+        if (!Boolean.TRUE.equals(user.getIsVerified())) {
+            return LoginResponse.builder()
+                    .token(null)
+                    .expiresIn(0)
+                    .isVerified(false)
+                    .emailOrTelegramId(user.getEmailOrTelegramId())
+                    .build();
+        }
 
         String token = tokenService.generateToken(user);
         return LoginResponse.builder()
                 .token(token)
                 .expiresIn(jwtConfig.getJwtExpiration())
+                .isVerified(true)
+                .emailOrTelegramId(user.getEmailOrTelegramId())
                 .build();
     }
 
@@ -119,21 +132,26 @@ public class TelegramAuthService {
     }
 
     private User registerFromTelegram(TelegramAuthRequest request) {
-        String email = "telegram_" + request.id() + "@" + TELEGRAM_EMAIL_DOMAIN;
+        String emailOrTelegramId = String.valueOf(request.id());
         String password = passwordEncoder.encode(UUID.randomUUID().toString());
 
         User user = User.builder()
-                .telegramId(request.id())
-                .telegramUsername(request.username())
-                .telegramFirstName(request.firstName())
-                .telegramLastName(request.lastName())
-                .telegramPhotoUrl(request.photoUrl())
-                .email(email)
+                .emailOrTelegramId(emailOrTelegramId)
                 .password(password)
                 .role(Role.USER)
                 .isVerified(true)
                 .build();
 
+        TelegramUser telegramUser = TelegramUser.builder()
+                .telegramId(request.id())
+                .telegramUsername(request.username())
+                .telegramFirstName(request.firstName())
+                .telegramLastName(request.lastName())
+                .telegramPhotoUrl(request.photoUrl())
+                .user(user)
+                .build();
+
+        user.setTelegramUser(telegramUser);
         return userRepository.save(user);
     }
 }

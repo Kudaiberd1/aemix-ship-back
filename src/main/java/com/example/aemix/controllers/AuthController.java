@@ -2,8 +2,14 @@ package com.example.aemix.controllers;
 
 import com.example.aemix.dto.VerifyUserDto;
 import com.example.aemix.dto.requests.AuthRequest;
+import com.example.aemix.dto.requests.ChangePasswordRequest;
+import com.example.aemix.dto.requests.ForgotPasswordRequest;
+import com.example.aemix.dto.requests.ResetPasswordRequest;
 import com.example.aemix.dto.requests.TelegramAuthRequest;
 import com.example.aemix.dto.responses.LoginResponse;
+import com.example.aemix.dto.responses.UserResponse;
+import com.example.aemix.entities.User;
+import com.example.aemix.mappers.UserMapper;
 import com.example.aemix.services.AuthService;
 import com.example.aemix.services.TelegramAuthService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -15,10 +21,11 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 import jakarta.validation.Valid;
-import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 
 @RestController
@@ -29,6 +36,7 @@ import jakarta.validation.constraints.NotBlank;
 public class AuthController {
     private final AuthService authService;
     private final TelegramAuthService telegramAuthService;
+    private final UserMapper userMapper;
 
     @Operation(
             summary = "Регистрация",
@@ -37,7 +45,7 @@ public class AuthController {
     @ApiResponses(value = {
             @ApiResponse(responseCode = "201", description = "Пользователь успешно зарегистрирован"),
             @ApiResponse(responseCode = "400", description = "Данные невалидны", content = @Content),
-            @ApiResponse(responseCode = "409", description = "Пользователь с таким email уже существует", content = @Content),
+            @ApiResponse(responseCode = "409", description = "Пользователь с таким идентификатором уже существует", content = @Content),
             @ApiResponse(responseCode = "500", description = "Внутренняя ошибка сервера", content = @Content)
     })
     @PostMapping("/register")
@@ -102,18 +110,85 @@ public class AuthController {
     )
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Код подтверждения отправлен"),
-            @ApiResponse(responseCode = "400", description = "Некорректный email", content = @Content),
+            @ApiResponse(responseCode = "400", description = "Некорректные данные", content = @Content),
             @ApiResponse(responseCode = "404", description = "Пользователь не найден", content = @Content),
             @ApiResponse(responseCode = "409", description = "Аккаунт уже подтвержден", content = @Content),
             @ApiResponse(responseCode = "500", description = "Внутренняя ошибка сервера", content = @Content)
     })
     public ResponseEntity<String> resendVerificationCode(
             @RequestParam
-            @Email(message = "Email must be valid")
-            @NotBlank(message = "Email is required")
-            String email
+            @NotBlank(message = "Email or Telegram ID is required")
+            String emailOrTelegramId
     ) {
-        authService.resendVerificationCode(email);
+        authService.resendVerificationCode(emailOrTelegramId);
         return ResponseEntity.ok("Verification code sent");
+    }
+
+    @PostMapping("/forgot-password")
+    @Operation(
+            summary = "Сброс пароля",
+            description = "Отправляет ссылку для сброса пароля на email"
+    )
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Пароль успешно сброшен"),
+            @ApiResponse(responseCode = "400", description = "Некорректные данные", content = @Content),
+            @ApiResponse(responseCode = "404", description = "Пользователь не найден", content = @Content),
+            @ApiResponse(responseCode = "500", description = "Внутренняя ошибка сервера", content = @Content)
+    })
+    public ResponseEntity<String> forgotPassword(
+            @Valid
+            @RequestBody
+            ForgotPasswordRequest request
+    ) {
+        authService.forgotPassword(request.getEmail());
+        return ResponseEntity.ok("Password reset email sent");
+    }
+
+    @PostMapping("/reset-password")
+    @Operation(
+            summary = "Сброс пароля",
+            description = "Сбрасывает пароль пользователя по reset token"
+    )
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Пароль успешно сброшен"),
+            @ApiResponse(responseCode = "400", description = "Некорректные данные", content = @Content),
+            @ApiResponse(responseCode = "404", description = "Пользователь не найден", content = @Content),
+            @ApiResponse(responseCode = "500", description = "Внутренняя ошибка сервера", content = @Content)
+    })
+    public ResponseEntity<String> resetPassword(
+            @Valid
+            @RequestBody
+            ResetPasswordRequest request
+    ) {
+        authService.resetPassword(request.getToken(), request.getPassword(), request.getConfirmPassword());
+        return ResponseEntity.ok("Password reset successfully");
+    }
+
+    @PostMapping("/change-password")
+    @Operation(
+            summary = "Изменение пароля",
+            description = "Изменяет пароль текущего авторизованного пользователя"
+    )
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Пароль успешно изменён"),
+            @ApiResponse(responseCode = "400", description = "Некорректные данные", content = @Content),
+            @ApiResponse(responseCode = "401", description = "Пользователь не авторизован", content = @Content),
+            @ApiResponse(responseCode = "404", description = "Пользователь не найден", content = @Content),
+            @ApiResponse(responseCode = "500", description = "Внутренняя ошибка сервера", content = @Content)
+    })
+    public ResponseEntity<String> changePassword(
+            @AuthenticationPrincipal Jwt jwt,
+            @Valid @RequestBody ChangePasswordRequest request
+    ) {
+        String identifier = jwt.getClaimAsString("emailOrTelegramId");
+        authService.changePassword(identifier, request);
+        return ResponseEntity.ok("Password changed successfully");
+    }
+
+    @GetMapping("/me")
+    @Operation(summary = "Проверка сессии", description = "Возвращает данные текущего пользователя, если он авторизован и существует в БД")
+    public ResponseEntity<UserResponse> me(@AuthenticationPrincipal Jwt jwt) {
+        User user = authService.getUser(jwt);
+        return ResponseEntity.ok(userMapper.toDto(user));
     }
 }

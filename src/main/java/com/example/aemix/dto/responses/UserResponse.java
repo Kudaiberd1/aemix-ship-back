@@ -1,12 +1,13 @@
 package com.example.aemix.dto.responses;
+
+import com.example.aemix.entities.enums.Role;
 import lombok.Builder;
 import lombok.Data;
 
 @Data
 @Builder
-public class LoginResponse {
-    private String token;
-    private long expiresIn;
-    private Boolean isVerified;
+public class UserResponse {
     private String emailOrTelegramId;
+    private Role role;
+    private Boolean isVerified;
 }
