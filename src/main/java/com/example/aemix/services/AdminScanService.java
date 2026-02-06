@@ -56,33 +56,6 @@ public class AdminScanService {
     }
 
     @Transactional
-    public OrderResponse scanReady(String trackCode, User user) {
-        Order order = orderRepository.findByTrackCode(trackCode)
-                .orElseThrow(() -> new ResourceNotFoundException("Заказ с трек-кодом " + trackCode + " не найден"));
-
-        if (order.getStatus() != Status.ARRIVED) {
-            throw new BusinessValidationException(
-                    "Заказ должен иметь статус ARRIVED. Текущий статус: " + order.getStatus()
-            );
-        }
-
-        Status oldStatus = order.getStatus();
-        order.setStatus(Status.READY);
-        orderRepository.save(order);
-
-        ScanLogs scanLog = ScanLogs.builder()
-                .order(order)
-                .oldStatus(oldStatus)
-                .newStatus(Status.READY)
-                .user(user)
-                .build();
-        scanLogsRepository.save(scanLog);
-
-        log.info("Заказ {} помечен как готов: {} -> {} пользователем {}", trackCode, oldStatus, Status.READY, user.getEmailOrTelegramId());
-        return orderMapper.toDto(order);
-    }
-
-    @Transactional
     public BulkOperationResponse bulkReady(BulkReadyRequest request, User user) {
         List<String> trackCodes = request.getTrackCodes();
         List<Order> orders = orderRepository.findByTrackCodeInAndStatus(trackCodes, Status.ARRIVED);

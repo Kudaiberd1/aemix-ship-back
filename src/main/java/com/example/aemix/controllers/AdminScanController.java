@@ -59,32 +59,6 @@ public class AdminScanController {
     }
 
     @Operation(
-            summary = "Изменение статуса заказа на READY",
-            description = "Изменяет статус заказа с ARRIVED на READY. Используется для одного заказа"
-    )
-    @ApiResponses(value = {
-            @ApiResponse(
-                    responseCode = "200",
-                    description = "Статус заказа успешно изменен",
-                    content = @Content(schema = @Schema(implementation = OrderResponse.class))
-            ),
-            @ApiResponse(responseCode = "400", description = "Некорректный статус заказа", content = @Content),
-            @ApiResponse(responseCode = "404", description = "Заказ не найден", content = @Content),
-            @ApiResponse(responseCode = "401", description = "Пользователь не авторизован", content = @Content),
-            @ApiResponse(responseCode = "403", description = "Недостаточно прав", content = @Content),
-            @ApiResponse(responseCode = "500", description = "Внутренняя ошибка сервера", content = @Content)
-    })
-    @PostMapping("/{trackCode}/scan-ready")
-    public ResponseEntity<OrderResponse> scanReady(
-            @AuthenticationPrincipal Jwt jwt,
-            @Parameter(description = "Трек-код заказа", required = true)
-            @PathVariable String trackCode
-    ) {
-        User user = authService.getUser(jwt);
-        return ResponseEntity.ok(adminScanService.scanReady(trackCode, user));
-    }
-
-    @Operation(
             summary = "Массовое изменение статуса заказов на READY",
             description = "Изменяет статус выбранных заказов с ARRIVED на READY. Используется для массовой операции"
     )
