@@ -13,7 +13,9 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.web.server.ResponseStatusException;
 
 @Service
 @RequiredArgsConstructor
@@ -36,6 +38,9 @@ public class AdminUserService {
 
     public UserResponse updateUser(String emailOrTelegramId, UserUpdateRequest request) {
         User user = userRepository.findByIdentifier(emailOrTelegramId).orElseThrow(() -> new ResourceNotFoundException("User not found"));
+        if (user.getRole() == Role.SUPER_ADMIN) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Cannot modify another SUPER_ADMIN");
+        }
 
         user.setRole(request.getRole());
 
@@ -44,6 +49,9 @@ public class AdminUserService {
 
     public void deleteUser(String emailOrTelegramId) {
         User user = userRepository.findByIdentifier(emailOrTelegramId).orElseThrow(() -> new ResourceNotFoundException("User not found"));
+        if (user.getRole() == Role.SUPER_ADMIN) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Cannot delete another SUPER_ADMIN");
+        }
 
         userRepository.delete(user);
     }

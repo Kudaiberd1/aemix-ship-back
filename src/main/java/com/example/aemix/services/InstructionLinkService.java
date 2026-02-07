@@ -24,34 +24,49 @@ public class InstructionLinkService {
     @PostConstruct
     @Transactional
     public void initDefaultLinks() {
-        if (instructionLinkRepository.count() > 0) {
-            return;
+        if (instructionLinkRepository.count() == 0) {
+            List<InstructionLink> defaults = List.of(
+                    InstructionLink.builder()
+                            .linkKey("pinduoduo")
+                            .title("PINDUODUO")
+                            .subtitle("Как заказать через приложение")
+                            .link("#")
+                            .sortOrder(1)
+                            .build(),
+                    InstructionLink.builder()
+                            .linkKey("alipay")
+                            .title("ALIPAY")
+                            .subtitle("Настройка оплаты")
+                            .link("#")
+                            .sortOrder(2)
+                            .build(),
+                    InstructionLink.builder()
+                            .linkKey("tracking")
+                            .title("ОТСЛЕЖИВАНИЕ")
+                            .subtitle("Как добавить трек-номер")
+                            .link("#")
+                            .sortOrder(3)
+                            .build(),
+                    InstructionLink.builder()
+                            .linkKey("video")
+                            .title("КАК ЗАКАЗАТЬ НА PINDUODUO")
+                            .subtitle("Полный гайд • видео")
+                            .link("#")
+                            .sortOrder(4)
+                            .build()
+            );
+            instructionLinkRepository.saveAll(defaults);
+            log.info("Initialized {} default instruction links", defaults.size());
+        } else if (instructionLinkRepository.findAll().stream().noneMatch(l -> "video".equals(l.getLinkKey()))) {
+            instructionLinkRepository.save(InstructionLink.builder()
+                    .linkKey("video")
+                    .title("КАК ЗАКАЗАТЬ НА PINDUODUO")
+                    .subtitle("Полный гайд • видео")
+                    .link("#")
+                    .sortOrder(4)
+                    .build());
+            log.info("Added video instruction link");
         }
-        List<InstructionLink> defaults = List.of(
-                InstructionLink.builder()
-                        .linkKey("pinduoduo")
-                        .title("PINDUODUO")
-                        .subtitle("Как заказать через приложение")
-                        .link("#")
-                        .sortOrder(1)
-                        .build(),
-                InstructionLink.builder()
-                        .linkKey("alipay")
-                        .title("ALIPAY")
-                        .subtitle("Настройка оплаты")
-                        .link("#")
-                        .sortOrder(2)
-                        .build(),
-                InstructionLink.builder()
-                        .linkKey("tracking")
-                        .title("ОТСЛЕЖИВАНИЕ")
-                        .subtitle("Как добавить трек-номер")
-                        .link("#")
-                        .sortOrder(3)
-                        .build()
-        );
-        instructionLinkRepository.saveAll(defaults);
-        log.info("Initialized {} default instruction links", defaults.size());
     }
 
     public List<InstructionLinkResponse> getAllLinks() {
@@ -65,6 +80,9 @@ public class InstructionLinkService {
     public InstructionLinkResponse updateLink(Long id, UpdateInstructionLinkRequest request) {
         InstructionLink link = instructionLinkRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Ссылка с id " + id + " не найдена"));
+        if (request.getTitle() != null && !request.getTitle().isBlank()) {
+            link.setTitle(request.getTitle().trim());
+        }
         link.setLink(request.getLink());
         if (request.getSubtitle() != null) {
             link.setSubtitle(request.getSubtitle());

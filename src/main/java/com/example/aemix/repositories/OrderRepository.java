@@ -23,7 +23,7 @@ public interface OrderRepository extends JpaRepository<Order, String> {
     @Query("""
     SELECT o FROM Order o
     LEFT JOIN o.city c
-    WHERE (CAST(:trackCode AS string) IS NULL OR LOWER(o.trackCode) LIKE LOWER(CONCAT('%', CAST(:trackCode AS string), '%')))
+    WHERE (CAST(:trackCode AS string) IS NULL OR LOWER(o.trackCode) LIKE LOWER(CONCAT(CAST(:trackCode AS string), '%')))
       AND (CAST(:status AS string) IS NULL OR o.status = :status)
       AND (CAST(:cityId AS long) IS NULL OR c.id = :cityId)
       AND (CAST(:fromDate AS localdatetime) IS NULL OR o.createdAt >= :fromDate)

@@ -161,8 +161,14 @@ public class AuthService {
     }
 
     public void forgotPassword(String email) {
+        if (email == null || !email.contains("@")) {
+            throw new BusinessValidationException("Password reset is only available for users registered with email");
+        }
         User user = userRepository.findByIdentifier(email)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+        if (user.getTelegramUser() != null) {
+            throw new BusinessValidationException("Password reset is not available for Telegram users");
+        }
 
         PasswordResetToken passwordResetToken = user.getPasswordResetToken();
         if (passwordResetToken == null) {
@@ -233,6 +239,10 @@ public class AuthService {
 
         User user = userRepository.findByIdentifier(identifier)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+
+        if (user.getTelegramUser() != null) {
+            throw new BusinessValidationException("Смена пароля недоступна для пользователей, авторизованных через Telegram");
+        }
 
         if (!passwordEncoder.matches(request.getCurrentPassword(), user.getPassword())) {
             throw new BusinessValidationException("Current password is incorrect");

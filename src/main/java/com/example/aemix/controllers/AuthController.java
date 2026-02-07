@@ -6,6 +6,7 @@ import com.example.aemix.dto.requests.ChangePasswordRequest;
 import com.example.aemix.dto.requests.ForgotPasswordRequest;
 import com.example.aemix.dto.requests.ResetPasswordRequest;
 import com.example.aemix.dto.requests.TelegramAuthRequest;
+import com.example.aemix.dto.requests.TelegramStartAppRequest;
 import com.example.aemix.dto.responses.LoginResponse;
 import com.example.aemix.dto.responses.UserResponse;
 import com.example.aemix.entities.User;
@@ -70,7 +71,7 @@ public class AuthController {
 
     @Operation(
             summary = "Авторизация через Telegram",
-            description = "Проверяет подпись Telegram Login Widget и возвращает JWT токен"
+            description = "Проверяет подпись данных, полученных по ссылке от Telegram-бота, и возвращает JWT токен"
     )
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Авторизация успешна",
@@ -84,6 +85,22 @@ public class AuthController {
             @Valid @RequestBody TelegramAuthRequest request
     ) {
         return ResponseEntity.ok(telegramAuthService.authenticate(request));
+    }
+
+    @PostMapping("/telegram/startapp")
+    @Operation(
+            summary = "Авторизация через Telegram Mini App",
+            description = "Обменивает одноразовый токен из startapp на JWT"
+    )
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Авторизация успешна",
+                    content = @Content(schema = @Schema(implementation = LoginResponse.class))),
+            @ApiResponse(responseCode = "401", description = "Недействительный или просроченный токен", content = @Content)
+    })
+    public ResponseEntity<LoginResponse> loginWithStartApp(
+            @Valid @RequestBody TelegramStartAppRequest request
+    ) {
+        return ResponseEntity.ok(telegramAuthService.authenticateByStartAppToken(request.token()));
     }
 
     @PostMapping("/verify")

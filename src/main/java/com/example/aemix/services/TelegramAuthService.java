@@ -3,10 +3,12 @@ package com.example.aemix.services;
 import com.example.aemix.config.JwtConfig;
 import com.example.aemix.dto.requests.TelegramAuthRequest;
 import com.example.aemix.dto.responses.LoginResponse;
+import com.example.aemix.entities.TelegramLoginToken;
 import com.example.aemix.entities.TelegramUser;
 import com.example.aemix.entities.User;
 import com.example.aemix.entities.enums.Role;
 import com.example.aemix.exceptions.UnauthorizedException;
+import com.example.aemix.repositories.TelegramLoginTokenRepository;
 import com.example.aemix.repositories.TelegramUserRepository;
 import com.example.aemix.repositories.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -22,6 +24,7 @@ import java.security.InvalidKeyException;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.Instant;
+import java.util.Base64;
 import java.util.Map;
 import java.util.TreeMap;
 import java.util.UUID;
@@ -37,7 +40,14 @@ public class TelegramAuthService {
     @Value("${telegram.auth.max-age-seconds:86400}")
     private long maxAgeSeconds;
 
+    @Value("${app.frontend-url:http://localhost:5173}")
+    private String frontendUrl;
+
+    @Value("${app.telegram-mini-app-link:https://t.me/aemix_ship_bot/aemix}")
+    private String miniAppLink;
+
     private final UserRepository userRepository;
+    private final TelegramLoginTokenRepository telegramLoginTokenRepository;
     private final TelegramUserRepository telegramUserRepository;
     private final TokenService tokenService;
     private final PasswordEncoder passwordEncoder;
@@ -80,6 +90,115 @@ public class TelegramAuthService {
         }
         long now = Instant.now().getEpochSecond();
         return (now - authDate) <= maxAgeSeconds;
+    }
+
+    /**
+     * Generates a signed login URL for the Telegram bot flow.
+     * The bot sends this URL to the user; when clicked, the frontend callback page
+     * reads params and sends them to POST /auth/telegram.
+     */
+    public String generateLoginLink(Long id, String firstName, String lastName, String username, String photoUrl) {
+        long authDate = Instant.now().getEpochSecond();
+        Map<String, String> data = new TreeMap<>();
+        data.put("auth_date", String.valueOf(authDate));
+        data.put("id", String.valueOf(id));
+        if (firstName != null && !firstName.isBlank()) data.put("first_name", firstName);
+        if (lastName != null && !lastName.isBlank()) data.put("last_name", lastName);
+        if (photoUrl != null && !photoUrl.isBlank()) data.put("photo_url", photoUrl);
+        if (username != null && !username.isBlank()) data.put("username", username);
+
+        String dataCheckString = data.entrySet().stream()
+                .map(e -> e.getKey() + "=" + e.getValue())
+                .collect(Collectors.joining("\n"));
+        byte[] secretKey = sha256(botToken);
+        byte[] hmac = hmacSha256(secretKey, dataCheckString);
+        String hash = bytesToHex(hmac);
+
+        StringBuilder url = new StringBuilder(frontendUrl).append("/telegram/callback?");
+        url.append("id=").append(id);
+        url.append("&auth_date=").append(authDate);
+        url.append("&hash=").append(hash);
+        if (firstName != null && !firstName.isBlank()) url.append("&first_name=").append(urlEncode(firstName));
+        if (lastName != null && !lastName.isBlank()) url.append("&last_name=").append(urlEncode(lastName));
+        if (username != null && !username.isBlank()) url.append("&username=").append(urlEncode(username));
+        if (photoUrl != null && !photoUrl.isBlank()) url.append("&photo_url=").append(urlEncode(photoUrl));
+
+        return url.toString();
+    }
+
+    /**
+     * Generates a link to open the Mini App directly in Telegram.
+     * Bot sends this link; when user clicks, Mini App opens with startapp param.
+     */
+    public String generateStartAppLoginLink(Long telegramId, String firstName, String lastName, String username) {
+        String token = Base64.getUrlEncoder().withoutPadding()
+                .encodeToString(UUID.randomUUID().toString().replace("-", "").getBytes(StandardCharsets.UTF_8))
+                .substring(0, 32);
+        Instant expiresAt = Instant.now().plusSeconds(300);
+
+        TelegramLoginToken entity = TelegramLoginToken.builder()
+                .token(token)
+                .telegramId(telegramId)
+                .firstName(firstName)
+                .lastName(lastName)
+                .username(username)
+                .expiresAt(expiresAt)
+                .build();
+        telegramLoginTokenRepository.save(entity);
+
+        String separator = miniAppLink.contains("?") ? "&" : "?";
+        return miniAppLink + separator + "startapp=" + token;
+    }
+
+    /**
+     * Exchanges a one-time startapp token for a JWT. Used when Mini App opens with startapp param.
+     */
+    public LoginResponse authenticateByStartAppToken(String token) {
+        TelegramLoginToken loginToken = telegramLoginTokenRepository
+                .findByTokenAndExpiresAtAfter(token, Instant.now())
+                .orElseThrow(() -> new UnauthorizedException("Invalid or expired login token"));
+
+        User user = telegramUserRepository.findByTelegramId(loginToken.getTelegramId())
+                .map(TelegramUser::getUser)
+                .orElseGet(() -> {
+                    TelegramAuthRequest authReq = new TelegramAuthRequest(
+                            loginToken.getTelegramId(),
+                            loginToken.getFirstName(),
+                            loginToken.getLastName(),
+                            loginToken.getUsername(),
+                            null,
+                            Instant.now().getEpochSecond(),
+                            "startapp"
+                    );
+                    return registerFromTelegram(authReq);
+                });
+
+        telegramLoginTokenRepository.delete(loginToken);
+
+        if (!Boolean.TRUE.equals(user.getIsVerified())) {
+            return LoginResponse.builder()
+                    .token(null)
+                    .expiresIn(0)
+                    .isVerified(false)
+                    .emailOrTelegramId(user.getEmailOrTelegramId())
+                    .build();
+        }
+
+        String jwt = tokenService.generateToken(user);
+        return LoginResponse.builder()
+                .token(jwt)
+                .expiresIn(jwtConfig.getJwtExpiration())
+                .isVerified(true)
+                .emailOrTelegramId(user.getEmailOrTelegramId())
+                .build();
+    }
+
+    private String urlEncode(String value) {
+        try {
+            return java.net.URLEncoder.encode(value, StandardCharsets.UTF_8);
+        } catch (Exception e) {
+            return value;
+        }
     }
 
     private boolean isValid(TelegramAuthRequest request) {

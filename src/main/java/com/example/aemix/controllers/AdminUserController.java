@@ -15,11 +15,8 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
@@ -80,14 +77,10 @@ public class AdminUserController {
     @PreAuthorize("hasAuthority('ROLE_SUPER_ADMIN')")
     @PutMapping("/{emailOrTelegramId}")
     public ResponseEntity<UserResponse> updateUser(
-            @AuthenticationPrincipal Jwt jwt,
             @Parameter(description = "Email или Telegram ID пользователя", required = true)
             @PathVariable("emailOrTelegramId") String emailOrTelegramId,
             @RequestBody @Valid UserUpdateRequest request
     ) {
-        if (isSuperAdminSelf(jwt, emailOrTelegramId)) {
-            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
-        }
         return ResponseEntity.ok(adminUserService.updateUser(emailOrTelegramId, request));
     }
 
@@ -105,21 +98,10 @@ public class AdminUserController {
     @PreAuthorize("hasAuthority('ROLE_SUPER_ADMIN')")
     @DeleteMapping("/{emailOrTelegramId}")
     public ResponseEntity<Void> deleteUser(
-            @AuthenticationPrincipal Jwt jwt,
             @Parameter(description = "Email или Telegram ID пользователя", required = true)
             @PathVariable("emailOrTelegramId") String emailOrTelegramId
     ) {
-        if (isSuperAdminSelf(jwt, emailOrTelegramId)) {
-            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
-        }
         adminUserService.deleteUser(emailOrTelegramId);
         return ResponseEntity.noContent().build();
-    }
-
-    private boolean isSuperAdminSelf(Jwt jwt, String targetIdentifier) {
-        if (jwt == null) return false;
-        if (!"SUPER_ADMIN".equals(jwt.getClaimAsString("role"))) return false;
-        String currentIdentifier = jwt.getClaimAsString("emailOrTelegramId");
-        return currentIdentifier != null && currentIdentifier.equals(targetIdentifier);
     }
 }
