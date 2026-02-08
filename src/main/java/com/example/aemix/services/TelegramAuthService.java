@@ -151,6 +151,138 @@ public class TelegramAuthService {
     }
 
     /**
+     * Authenticates via Telegram Mini App initData.
+     * initData передаётся при открытии Mini App из Telegram, валидируется по HMAC.
+     */
+    public LoginResponse authenticateByInitData(String initData) {
+        long telegramId = validateInitDataAndExtractUserId(initData);
+        User user = telegramUserRepository.findByTelegramId(telegramId)
+                .map(TelegramUser::getUser)
+                .orElseGet(() -> registerFromInitData(initData, telegramId));
+
+        if (!Boolean.TRUE.equals(user.getIsVerified())) {
+            return LoginResponse.builder()
+                    .token(null)
+                    .expiresIn(0)
+                    .isVerified(false)
+                    .emailOrTelegramId(user.getEmailOrTelegramId())
+                    .build();
+        }
+
+        String jwt = tokenService.generateToken(user);
+        return LoginResponse.builder()
+                .token(jwt)
+                .expiresIn(jwtConfig.getJwtExpiration())
+                .isVerified(true)
+                .emailOrTelegramId(user.getEmailOrTelegramId())
+                .build();
+    }
+
+    private long validateInitDataAndExtractUserId(String initData) {
+        if (initData == null || initData.isBlank()) {
+            throw new UnauthorizedException("Invalid initData");
+        }
+        Map<String, String> params = parseInitDataRaw(initData);
+        String hash = params.remove("hash");
+        if (hash == null || hash.isBlank()) {
+            throw new UnauthorizedException("Invalid initData: missing hash");
+        }
+        String dataCheckString = params.entrySet().stream()
+                .sorted(Map.Entry.comparingByKey())
+                .map(e -> e.getKey() + "=" + e.getValue())
+                .collect(Collectors.joining("\n"));
+        byte[] secretKey = hmacSha256WithKeyBytes("WebAppData".getBytes(StandardCharsets.UTF_8), botToken);
+        byte[] calculatedHash = hmacSha256WithKeyBytes(secretKey, dataCheckString);
+        String calculatedHex = bytesToHex(calculatedHash);
+        if (!calculatedHex.equalsIgnoreCase(hash)) {
+            throw new UnauthorizedException("Invalid initData signature");
+        }
+        String authDateStr = params.get("auth_date");
+        if (authDateStr != null) {
+            long authDate = Long.parseLong(authDateStr);
+            if (!isFresh(authDate)) {
+                throw new UnauthorizedException("initData expired");
+            }
+        }
+        String userJson = params.get("user");
+        if (userJson == null || userJson.isBlank()) {
+            throw new UnauthorizedException("Invalid initData: missing user");
+        }
+        return extractUserIdFromUserJson(userJson);
+    }
+
+    private Map<String, String> parseInitDataRaw(String initData) {
+        Map<String, String> result = new java.util.HashMap<>();
+        for (String part : initData.split("&")) {
+            int eq = part.indexOf('=');
+            if (eq > 0) {
+                String key = part.substring(0, eq);
+                String value = eq + 1 < part.length() ? part.substring(eq + 1) : "";
+                result.put(key, value);
+            }
+        }
+        return result;
+    }
+
+    private Map<String, String> parseInitData(String initData) {
+        Map<String, String> result = new java.util.HashMap<>();
+        for (String part : initData.split("&")) {
+            int eq = part.indexOf('=');
+            if (eq > 0) {
+                String key = java.net.URLDecoder.decode(part.substring(0, eq), StandardCharsets.UTF_8);
+                String value = eq + 1 < part.length()
+                        ? java.net.URLDecoder.decode(part.substring(eq + 1), StandardCharsets.UTF_8)
+                        : "";
+                result.put(key, value);
+            }
+        }
+        return result;
+    }
+
+    private long extractUserIdFromUserJson(String userJson) {
+        try {
+            String decoded = java.net.URLDecoder.decode(userJson, StandardCharsets.UTF_8);
+            var node = new com.fasterxml.jackson.databind.ObjectMapper().readTree(decoded);
+            var idNode = node.get("id");
+            if (idNode == null || !idNode.isNumber()) {
+                throw new UnauthorizedException("Invalid initData: user.id not found");
+            }
+            return idNode.asLong();
+        } catch (Exception e) {
+            throw new UnauthorizedException("Invalid initData: cannot parse user");
+        }
+    }
+
+    private User registerFromInitData(String initData, long telegramId) {
+        Map<String, String> params = parseInitData(initData);
+        String userJson = params.get("user");
+        String firstName = null, lastName = null, username = null, photoUrl = null;
+        if (userJson != null) {
+            try {
+                String decoded = java.net.URLDecoder.decode(userJson, StandardCharsets.UTF_8);
+                var node = new com.fasterxml.jackson.databind.ObjectMapper().readTree(decoded);
+                if (node.has("first_name")) firstName = node.get("first_name").asText(null);
+                if (node.has("last_name")) lastName = node.get("last_name").asText(null);
+                if (node.has("username")) username = node.get("username").asText(null);
+                if (node.has("photo_url")) photoUrl = node.get("photo_url").asText(null);
+            } catch (Exception ignored) {}
+        }
+        TelegramAuthRequest req = new TelegramAuthRequest(telegramId, firstName, lastName, username, photoUrl,
+                Instant.now().getEpochSecond(), "initdata");
+        return registerFromTelegram(req);
+    }
+
+    private byte[] hmacSha256WithKeyBytes(byte[] key, String data) {
+        try {
+            Mac mac = Mac.getInstance("HmacSHA256");
+            mac.init(new SecretKeySpec(key, "HmacSHA256"));
+            return mac.doFinal(data.getBytes(StandardCharsets.UTF_8));
+        } catch (NoSuchAlgorithmException | InvalidKeyException e) {
+            throw new IllegalStateException(e);
+        }
+    }
+
+    /**
      * Exchanges a one-time startapp token for a JWT. Used when Mini App opens with startapp param.
      */
     public LoginResponse authenticateByStartAppToken(String token) {

@@ -146,12 +146,7 @@ public class AuthService {
         String htmlTemplate = loadTemplate("templates/verification-email.html");
         String htmlMessage = htmlTemplate.replace("{{verificationCode}}", verificationCode);
 
-        try {
-            emailService.sendVerificationEmail(user.getEmailOrTelegramId(), subject, htmlMessage);
-        } catch (MessagingException e) {
-            log.error("Failed to send verification email to {}", user.getEmailOrTelegramId(), e);
-            throw new EmailSendException("Failed to send verification email", e);
-        }
+        emailService.sendVerificationEmail(user.getEmailOrTelegramId(), subject, htmlMessage);
     }
 
     private String generateVerificationCode() {
@@ -213,12 +208,7 @@ public class AuthService {
         String htmlTemplate = loadTemplate("templates/reset-password-email.html");
         String htmlMessage = htmlTemplate.replace("{{resetLink}}", resetLink);
 
-        try {
-            emailService.sendVerificationEmail(user.getEmailOrTelegramId(), subject, htmlMessage);
-        } catch (MessagingException e) {
-            log.error("Failed to send reset password email to {}", user.getEmailOrTelegramId(), e);
-            throw new EmailSendException("Failed to send reset password email", e);
-        }
+        emailService.sendVerificationEmail(user.getEmailOrTelegramId(), subject, htmlMessage);
     }
 
     private String loadTemplate(String path) {

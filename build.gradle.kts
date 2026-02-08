@@ -47,6 +47,7 @@ dependencies {
     implementation("org.apache.poi:poi-ooxml:5.3.0")
     implementation("org.mapstruct:mapstruct:1.5.5.Final")
     annotationProcessor("org.mapstruct:mapstruct-processor:1.5.5.Final")
+    implementation("com.resend:resend-java:3.1.0")
 }
 
 tasks.withType<Test> {

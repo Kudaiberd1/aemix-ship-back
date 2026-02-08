@@ -6,6 +6,7 @@ import com.example.aemix.dto.requests.ChangePasswordRequest;
 import com.example.aemix.dto.requests.ForgotPasswordRequest;
 import com.example.aemix.dto.requests.ResetPasswordRequest;
 import com.example.aemix.dto.requests.TelegramAuthRequest;
+import com.example.aemix.dto.requests.TelegramInitDataRequest;
 import com.example.aemix.dto.requests.TelegramStartAppRequest;
 import com.example.aemix.dto.responses.LoginResponse;
 import com.example.aemix.dto.responses.UserResponse;
@@ -85,6 +86,22 @@ public class AuthController {
             @Valid @RequestBody TelegramAuthRequest request
     ) {
         return ResponseEntity.ok(telegramAuthService.authenticate(request));
+    }
+
+    @PostMapping("/telegram/init")
+    @Operation(
+            summary = "Авторизация через initData Mini App",
+            description = "Валидирует initData от Telegram Web App и возвращает JWT. Вызывать при открытии Mini App."
+    )
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Авторизация успешна",
+                    content = @Content(schema = @Schema(implementation = LoginResponse.class))),
+            @ApiResponse(responseCode = "401", description = "Невалидная initData", content = @Content)
+    })
+    public ResponseEntity<LoginResponse> loginWithInitData(
+            @Valid @RequestBody TelegramInitDataRequest request
+    ) {
+        return ResponseEntity.ok(telegramAuthService.authenticateByInitData(request.initData()));
     }
 
     @PostMapping("/telegram/startapp")
